@@ -1,6 +1,10 @@
 # demo-java-springboot-logging-otel-collector
 How to use opentelemetry collector.
 
+> [!IMPORTANT]  
+> The logs are being sent as raw data.\
+> For some reason the otel collector is not recognizing the source type `_json`.
+
 ## How to run it locally?
 ### Docker compose
 
