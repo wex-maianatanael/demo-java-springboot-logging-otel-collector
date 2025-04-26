@@ -1,0 +1,86 @@
+services:
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: demo/otel-splunk-logging:1.0
+    container_name: springboot-api
+    ports:
+      - "8080:8080"
+    restart:
+      always
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      #- OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      #- OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+      - OTEL_EXPORTER_OTLP_INSECURE=true
+      - OTEL_SERVICE_NAME=otelcollector-splunk
+      - OTEL_METRICS_EXPORTER=otlp
+      - OTEL_LOGS_EXPORTER=otlp
+      - OTEL_TRACES_EXPORTER=otlp
+      - OTEL_PROPAGATORS=tracecontext,baggage
+      - OTEL_LOGS_LEVEL=DEBUG
+    depends_on:
+      - otel-collector
+    networks:
+      - observability
+
+  splunk:
+    image: splunk/splunk:latest
+    container_name: splunk
+    environment:
+      - SPLUNK_START_ARGS=--accept-license
+      - SPLUNK_HEC_TOKEN=10e77cb3-8c29-4e7b-a9d5-79bcfe013a57
+      #- SPLUNK_HEC_ENABLE=true
+      #- SPLUNK_HEC_PORT=8088
+      - SPLUNK_PASSWORD=opentelemetry
+    expose:
+      - 8000
+      - 8088
+    ports:
+      - 8000:8000 #UI
+      - 8088:8088 #HEC
+    healthcheck:
+#      test: ['CMD', 'curl', '-f', 'http://localhost:8000']
+#      interval: 5s
+#      timeout: 5s
+#      retries: 20
+      test: curl -k https://localhost:8088/services/collector/health || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart:
+      always
+    volumes:
+      - ./splunk.yaml:/tmp/defaults/default.yml
+      - /opt/splunk/var
+      - /opt/splunk/etc
+    networks:
+      - observability
+
+  # official otel collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    expose:
+      - "4317" # gRPC
+      - "4318" # HTTP
+    ports:
+      - "4317:4317" # gRPC
+      - "4318:4318" # HTTP
+    restart:
+      always
+    depends_on:
+      splunk:
+        condition: service_healthy
+    networks:
+      - observability
+
+networks:
+  observability:
+    driver: bridge

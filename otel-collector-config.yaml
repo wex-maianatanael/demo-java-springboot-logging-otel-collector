@@ -1,0 +1,71 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      #http:
+       # endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+
+exporters:
+  debug:
+    verbosity: detailed
+
+  # Sample configuration for Splunk HEC exporter, not enabled in this example
+  splunk_hec:
+    # TODO: Update token to your Splunk HEC token
+    token: "10e77cb3-8c29-4e7b-a9d5-79bcfe013a57"
+    # TODO: Update URL to point to your Splunk HEC endpoint
+    endpoint: "https://splunk:8088/services/collector/event"
+    # Optional Splunk source (meta field in Splunk)
+    source: "my-app"
+    # Optional Splunk source type (meta field in Splunk)
+    sourcetype: "_default" #"_json"
+    # Splunk index name, this must match the index name in your Splunk index
+    index: "demo"
+    disable_compression: false
+    timeout: 10s
+    tls:
+      # TODO: update tls based on your Splunk HEC configuration
+      insecure_skip_verify: true
+
+# Configure health check extension for collector
+# This will be enabled in service section
+# Read latest notes on health check extension here:
+# https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/extension/healthcheckextension/README.md
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  pprof:
+    endpoint: :1888
+  zpages:
+    endpoint: :55679
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug, splunk_hec]
+  extensions: [pprof, zpages, health_check]
+
+  # Enable metrics generator for collector itself
+#  telemetry:
+#    metrics:
+#      level: normal
+#      readers:
+#        - periodic:
+#            exporter:
+#              otlp:
+#                protocol: grpc
+#                endpoint: http://0.0.0.0:4317
